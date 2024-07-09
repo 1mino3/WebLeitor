@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leitor de Libras</title>
+    <script defer src="script.js">
+    </script>
+    <style>
+        body {
+            text-align: center;
+            font-family: Arial, sans-serif;
+            background-image: linear-gradient(to bottom, rgb(24, 204, 24), rgb(219, 255, 219));
+            background-attachment: fixed;
+        }
+        
+        span {
+            font-family: 'Times New Roman', Times, serif;
+        }
+
+        video {
+            border-radius: 20px;
+            border: 2px solid black;
+            box-shadow: 2px 2px 2px black;
+        }
+
+        #prediction {
+            background-color: rgba(43, 88, 43, 0.288);
+        }
+    </style>
+</head>
+<body>
+    <h1><span>Concios Company</span> - Leitor de Libras</h1>
+    <video id="videoElement" width="640" height="480" autoplay></video>
+    <canvas id="canvasElement" width="640" height="480" style="display:none;"></canvas>
+    <div id="prediction"></div>
+</body>
+</html>
