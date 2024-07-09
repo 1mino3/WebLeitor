@@ -3,7 +3,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const canvas = document.getElementById('canvasElement');
     const predictionDiv = document.getElementById('prediction');
 
-    // Inicialização da câmera
     if (navigator.mediaDevices.getUserMedia) {
         navigator.mediaDevices.getUserMedia({ video: true })
             .then(function (stream) {
@@ -12,7 +11,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 video.onloadeddata = function () {
                     canvas.width = video.videoWidth;
                     canvas.height = video.videoHeight;
-                    setInterval(processVideo, 1000); // Chama a função processVideo a cada 1s
+                    setInterval(processVideo, 1000); 
                 };
             })
             .catch(function (err) {
@@ -24,12 +23,10 @@ document.addEventListener('DOMContentLoaded', function () {
         predictionDiv.innerText = "getUserMedia não é suportado no seu navegador.";
     }
 
-    // Função para processar o vídeo e enviar a imagem ao servidor
     function processVideo() {
         const context = canvas.getContext('2d');
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-        // Capturar a imagem do canvas
         canvas.toBlob(function (blob) {
             const formData = new FormData();
             formData.append('image', blob, 'frame.png');
