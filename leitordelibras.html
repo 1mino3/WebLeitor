@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leitor de Libras</title>
+    <style>
+        body {
+            background-image: linear-gradient(to bottom, rgb(24, 204, 24), rgb(219, 255, 219));
+            background-attachment: fixed;
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+
+        button {
+            padding: 20px;
+            border-radius: 35px;
+            border: none;
+            box-shadow: 1px 1px 1px black;
+            font-size: 15px;
+            margin-bottom: 50px;
+        }
+
+        button:hover {
+            background-color: rgb(223, 222, 222);
+            transition: 0.3s;
+        }
+
+        button:active {
+            background-color: rgb(211, 211, 211);
+            transition: 0.1s;
+        }
+
+        .video-container {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            max-width: 800px;
+            margin: auto;
+        }
+
+        video, canvas {
+            border-radius: 20px;
+            width: 100%;
+            height: auto;
+        }
+
+        video {
+            top: 0;
+            left: 0;
+            border: 2px solid black;
+            pointer-events: none;
+        }
+
+        canvas {
+            position: absolute;
+            pointer-events: none;
+        }
+
+        p {
+            margin-top: 10px;
+        }
+
+        span {
+            font-family: 'Times New Roman', Times, serif;
+            font-weight: bold;
+        }
+
+        @media (max-width: 600px) {
+            button {
+                width: 100%;
+                padding: 15px;
+            }
+        }
+
+    </style>
+</head>
+<body>
+    <h1><span>Concios Company </span>- Leitor de Libras</h1>
+    <button id="startButton">Iniciar</button>
+    <main>
+        <div class="video-container">
+            <video id="video" autoplay></video>
+            <canvas id="canvas"></canvas>
+        </div>
+        <p>Libra detectada: <span id="libra"></span></p>
+    </main>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/handpose"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils"></script>
+    <script>
+        let video = document.getElementById('video');
+        let canvas = document.getElementById('canvas');
+        let ctx = canvas.getContext('2d');
+        let model;
+        var libra = document.getElementById('libra');
+        let camera;
+
+        const classes = ['A', 'B', 'C', 'D', 'E'];
+
+        async function loadModel() {
+            try {
+                model = await tf.loadLayersModel('model.json');
+                console.log("Modelo carregado com sucesso!");
+            } catch (error) {
+                console.error("Erro ao carregar o modelo:", error);
+            }
+        }
+
+        async function setupCamera() {
+            if (camera) {
+                console.log("A câmera já está inicializada.");
+                return video;
+            }
+
+            try {
+                console.log("Tentando acessar a câmera...");
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: 1280, height: 720 },
+                    audio: false
+                });
+                video.srcObject = stream;
+                return new Promise((resolve) => {
+                    video.onloadedmetadata = () => {
+                        resolve(video);
+                    };
+                });
+            } catch (error) {
+                console.error("Erro ao acessar a câmera:", error);
+            }
+        }
+
+        async function processVideo() {
+            if (camera) {
+                console.log("O processamento de vídeo já está em execução.");
+                return;
+            }
+
+            const hands = new Hands({ locateFile: (file) => {
+                return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+            }});
+            hands.setOptions({
+                maxNumHands: 1,
+                modelComplexity: 1,
+                minDetectionConfidence: 0.5,
+                minTrackingConfidence: 0.5
+            });
+
+            hands.onResults(onResults);
+
+            camera = new Camera(video, {
+                onFrame: async () => {
+                    await hands.send({ image: video });
+                },
+                width: 1280,
+                height: 720
+            });
+            camera.start();
+        }
+
+        function onResults(results) {
+            // Ajustar dimensões do canvas para coincidir com o vídeo
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            if (results.multiHandLandmarks) {
+                for (const landmarks of results.multiHandLandmarks) {
+                    const boundingBox = getBoundingBox(landmarks);
+                    const [x, y, width, height] = boundingBox;
+
+                    ctx.strokeStyle = 'green';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(x, y, width, height);
+
+                    const handImage = captureHandImage(x, y, width, height);
+                    classifyHand(handImage);
+                }
+            }
+        }
+
+        function captureHandImage(x, y, width, height) {
+            const handImage = document.createElement('canvas');
+            handImage.width = 224;
+            handImage.height = 224;
+            const handCtx = handImage.getContext('2d');
+            handCtx.drawImage(video, x, y, width, height, 0, 0, 224, 224);
+            return handImage;
+        }
+
+        async function classifyHand(image) {
+            const imageData = tf.browser.fromPixels(image);
+            console.log("Forma da imagem:", imageData.shape);
+            const resized = tf.image.resizeBilinear(imageData, [224, 224]);
+            const normalized = resized.div(255.0).expandDims(0);
+
+            try {
+                const prediction = await model.predict(normalized).data();
+                const maxIndex = prediction.indexOf(Math.max(...prediction));
+                const classLabel = classes[maxIndex];
+                console.log("Classe prevista:", classLabel);
+                libra.innerHTML = classLabel; // Atualiza o texto da libra detectada
+            } catch (error) {
+                console.error("Erro ao fazer a previsão:", error);
+            }
+        }
+
+        function getBoundingBox(landmarks) {
+            let xMin = Infinity, yMin = Infinity, xMax = -Infinity, yMax = -Infinity;
+            for (const landmark of landmarks) {
+                const x = landmark.x * video.videoWidth;
+                const y = landmark.y * video.videoHeight;
+                if (x < xMin) xMin = x;
+                if (y < yMin) yMin = y;
+                if (x > xMax) xMax = x;
+                if (y > yMax) yMax = y;
+            }
+            return [xMin, yMin, xMax - xMin, yMax - yMin];
+        }
+
+        function clicar() {
+            loadModel().then(setupCamera).then(processVideo);
+        }
+
+        document.getElementById('startButton').addEventListener('click', clicar);
+    </script>
+</body>
+</html>
